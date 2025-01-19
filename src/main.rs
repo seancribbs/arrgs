@@ -2,11 +2,13 @@ use clap::Parser;
 
 mod split_input;
 
-use crate::split_input::Splitter;
-
 use std::io;
 use std::io::Read;
 use std::process::{self, Command};
+
+use rayon::prelude::*;
+
+use crate::split_input::Splitter;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -14,13 +16,19 @@ struct Args {
     #[arg(short = '0', long)]
     nul: bool,
 
+    /// Number of inputs to pass to the sub-command at a time
+    #[arg(short = 'n', long, default_value = "1")]
+    nargs: usize,
+
+    /// The program to invoke for each set of inputs
     program: String,
+
+    /// Additional arguments to the program. Inputs are added after these
+    /// arguments.
     program_args: Vec<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // First version: 1 argument, one subprocess, sequential
-    //
     let options = Args::parse();
 
     let mut input_buffer = vec![];
@@ -34,24 +42,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read inputs from stdin
     //   - whitespace-separated, or NUL-separated with a flag
     //   - options: number of arguments to pass, number of concurrent sub-processes
-    for item in inputs {
-        // For each batch of inputs:
-        //   - spawn a sub-process, appending the inputs to its command-line args
+    inputs.chunks(options.nargs).par_bridge().for_each(|items| {
         let status = Command::new(&options.program)
             .args(&options.program_args)
-            .arg(item)
-            .status()?;
+            .args(&items)
+            .status()
+            .expect("command could not be spawned");
         match status.code() {
             None | Some(0) => (),
             Some(code) => {
                 eprintln!(
-                    "Command {} {:?} {} failed with status {code}",
-                    &options.program, &options.program_args, item
+                    "Command {} {:?} {items:?} failed with status {code}",
+                    &options.program, &options.program_args
                 );
                 process::exit(code);
             }
         }
-    }
-
+    });
     Ok(())
 }

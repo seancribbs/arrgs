@@ -8,10 +8,7 @@ impl<'a> Iterator for NullSplitter<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let null_index = self
-            .buffer
-            .iter()
-            .position(|&b| b == 0);
+        let null_index = self.buffer.iter().position(|&b| b == 0);
         let output = match null_index {
             None => {
                 if self.buffer.is_empty() {
@@ -45,6 +42,13 @@ impl<'a> Splitter<'a> {
         let contents = buffer.utf8_chunks().next().map_or("", |c| c.valid());
         Self::Whitespace(contents.split_whitespace())
     }
+
+    pub fn chunks(self, chunk_size: usize) -> SplitterChunks<'a> {
+        SplitterChunks {
+            iter: self,
+            chunk_size,
+        }
+    }
 }
 
 impl<'a> Iterator for Splitter<'a> {
@@ -54,6 +58,24 @@ impl<'a> Iterator for Splitter<'a> {
         match self {
             Splitter::Null(null_splitter) => null_splitter.next(),
             Splitter::Whitespace(split_whitespace) => split_whitespace.next(),
+        }
+    }
+}
+
+pub struct SplitterChunks<'a> {
+    chunk_size: usize,
+    iter: Splitter<'a>,
+}
+
+impl<'a> Iterator for SplitterChunks<'a> {
+    type Item = Vec<&'a str>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result: Vec<_> = self.iter.by_ref().take(self.chunk_size).collect();
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
         }
     }
 }
@@ -106,5 +128,19 @@ mod tests {
         assert_eq!(result, vec!["foo"]);
         let result: Vec<_> = Splitter::whitespace(buffer).collect();
         assert_eq!(result, vec!["foo"]);
+    }
+
+    #[test]
+    fn chunks_1() {
+        let buffer = b"foo\0bar\0baz\0";
+        let result: Vec<_> = Splitter::null(buffer).chunks(1).collect();
+        assert_eq!(result, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
+    }
+
+    #[test]
+    fn chunks_incomplete() {
+        let buffer = b"foo\0bar\0baz\0";
+        let result: Vec<_> = Splitter::null(buffer).chunks(2).collect();
+        assert_eq!(result, vec![vec!["foo", "bar"], vec!["baz"]]);
     }
 }
