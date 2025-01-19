@@ -1,10 +1,10 @@
 use clap::Parser;
 
+mod exec;
 mod split_input;
 
 use std::io;
 use std::io::Read;
-use std::process::{self, Command};
 
 use rayon::prelude::*;
 
@@ -39,25 +39,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Splitter::whitespace(&input_buffer)
     };
-    // Read inputs from stdin
-    //   - whitespace-separated, or NUL-separated with a flag
-    //   - options: number of arguments to pass, number of concurrent sub-processes
+
     inputs.chunks(options.nargs).par_bridge().for_each(|items| {
-        let status = Command::new(&options.program)
-            .args(&options.program_args)
-            .args(&items)
-            .status()
-            .expect("command could not be spawned");
-        match status.code() {
-            None | Some(0) => (),
-            Some(code) => {
-                eprintln!(
-                    "Command {} {:?} {items:?} failed with status {code}",
-                    &options.program, &options.program_args
-                );
-                process::exit(code);
-            }
-        }
+        exec::exec(&options.program, &options.program_args, items);
     });
     Ok(())
 }
