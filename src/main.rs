@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 mod exec;
 mod split_input;
@@ -10,6 +10,14 @@ use rayon::prelude::*;
 
 use crate::split_input::Splitter;
 
+#[derive(Default, ValueEnum, Copy, Clone, PartialEq, Eq, Debug)]
+enum Mode {
+    #[default]
+    Simple,
+    Grouped,
+    Interactive,
+}
+
 #[derive(Parser, Debug)]
 struct Args {
     /// Use null-separated inputs, e.g. output from `find -0`
@@ -20,17 +28,29 @@ struct Args {
     #[arg(short = 'n', long, default_value = "1")]
     nargs: usize,
 
+    /// Display mode
+    #[arg(short = 'm', long, value_enum, default_value_t = Mode::Simple)]
+    mode: Mode,
+
     /// The program to invoke for each set of inputs
     program: String,
 
-    /// Additional arguments to the program. Inputs are added after these
-    /// arguments.
+    /// Additional arguments to the program. Inputs read from stdin are added
+    /// after these. arguments.
     program_args: Vec<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = Args::parse();
 
+    match options.mode {
+        Mode::Simple => simple(options),
+        Mode::Grouped => todo!(),
+        Mode::Interactive => todo!(),
+    }
+}
+
+fn simple(options: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut input_buffer = vec![];
     io::stdin().read_to_end(&mut input_buffer)?;
 
