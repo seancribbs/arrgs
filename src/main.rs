@@ -1,6 +1,8 @@
-use clap::{Parser, ValueEnum};
+#![feature(iter_intersperse)]
 
+use clap::{Parser, ValueEnum};
 mod exec;
+mod interactive;
 mod split_input;
 
 use std::io;
@@ -19,7 +21,7 @@ enum Mode {
 }
 
 #[derive(Parser, Debug)]
-struct Args {
+struct Options {
     /// Use null-separated inputs, e.g. output from `find -0`
     #[arg(short = '0', long)]
     nul: bool,
@@ -40,17 +42,17 @@ struct Args {
     program_args: Vec<String>,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let options = Args::parse();
+fn main() -> anyhow::Result<()> {
+    let options = Options::parse();
 
     match options.mode {
         Mode::Simple => simple(options),
         Mode::Grouped => todo!(),
-        Mode::Interactive => todo!(),
+        Mode::Interactive => interactive::run(options),
     }
 }
 
-fn simple(options: Args) -> Result<(), Box<dyn std::error::Error>> {
+fn simple(options: Options) -> anyhow::Result<()> {
     let mut input_buffer = vec![];
     io::stdin().read_to_end(&mut input_buffer)?;
 
