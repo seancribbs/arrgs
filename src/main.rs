@@ -1,9 +1,10 @@
 #![feature(iter_intersperse)]
 
+use std::io::{stdin, Read};
+
 use clap::{Parser, ValueEnum};
 use exec::{Executor, Parallel, Sequential};
 use split_input::Splitter;
-use std::io::{stdin, Read};
 
 mod exec;
 mod interactive;
@@ -18,7 +19,7 @@ enum Mode {
     Interactive,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 struct Options {
     /// Use null-separated inputs, e.g. output from `find -0`
     #[arg(short = '0', long)]
@@ -43,6 +44,9 @@ struct Options {
 fn main() -> anyhow::Result<()> {
     let options = Options::parse();
     let mut input_buffer = vec![];
+    if options.mode == Mode::Interactive {
+        return interactive::run(options);
+    }
     stdin().read_to_end(&mut input_buffer)?;
     let inputs = if options.nul {
         Splitter::null(&input_buffer)
@@ -52,6 +56,6 @@ fn main() -> anyhow::Result<()> {
     match options.mode {
         Mode::Simple => Sequential.execute(&options, inputs).map(|_| ()),
         Mode::Parallel => Parallel.execute(&options, inputs).map(|_| ()),
-        Mode::Interactive => interactive::run(options),
+        Mode::Interactive => unreachable!(),
     }
 }
