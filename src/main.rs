@@ -1,22 +1,20 @@
 #![feature(iter_intersperse)]
 
 use clap::{Parser, ValueEnum};
+use exec::{Executor, Parallel, Sequential};
+use split_input::Splitter;
+use std::io::{stdin, Read};
+
 mod exec;
 mod interactive;
 mod split_input;
 
-use std::io;
-use std::io::Read;
-
-use rayon::prelude::*;
-
-use crate::split_input::Splitter;
-
 #[derive(Default, ValueEnum, Copy, Clone, PartialEq, Eq, Debug)]
 enum Mode {
     #[default]
+    #[value(alias("sequential"))]
     Simple,
-    Grouped,
+    Parallel,
     Interactive,
 }
 
@@ -44,26 +42,16 @@ struct Options {
 
 fn main() -> anyhow::Result<()> {
     let options = Options::parse();
-
-    match options.mode {
-        Mode::Simple => simple(options),
-        Mode::Grouped => todo!(),
-        Mode::Interactive => interactive::run(options),
-    }
-}
-
-fn simple(options: Options) -> anyhow::Result<()> {
     let mut input_buffer = vec![];
-    io::stdin().read_to_end(&mut input_buffer)?;
-
+    stdin().read_to_end(&mut input_buffer)?;
     let inputs = if options.nul {
         Splitter::null(&input_buffer)
     } else {
         Splitter::whitespace(&input_buffer)
     };
-
-    inputs.chunks(options.nargs).par_bridge().for_each(|items| {
-        exec::exec(&options.program, &options.program_args, items);
-    });
-    Ok(())
+    match options.mode {
+        Mode::Simple => Sequential.execute(&options, inputs).map(|_| ()),
+        Mode::Parallel => Parallel.execute(&options, inputs).map(|_| ()),
+        Mode::Interactive => interactive::run(options),
+    }
 }
