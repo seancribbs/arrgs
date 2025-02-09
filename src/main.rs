@@ -37,8 +37,12 @@ struct Options {
     program: String,
 
     /// Additional arguments to the program. Inputs read from stdin are added
-    /// after these. arguments.
+    /// after these arguments.
     program_args: Vec<String>,
+
+    /// Simulate a program feeding the UI some inputs.
+    #[arg(short = 's', long)]
+    simulate: bool,
 }
 
 fn main() -> anyhow::Result<()> {
